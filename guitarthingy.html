@@ -1,0 +1,300 @@
+<!-- todo
+
+-->
+
+<html style="background: #37393A; color: #fefae0; font-family: sans-serif;">
+<head>
+	<script>
+		const COLORS = {
+			background:"#37393A",
+			text:"#FA7921",
+			fretboard:"#874E1C",
+			inlay:"rgba(255,255,255,0.1)",
+			frets:"rgba(255,255,255,0.75)",
+			strings:"#FA7921",
+			note:"#fefae0",
+			noteLabel:"#37393A",
+			rootNote:"#1BE7FF",
+			rootNoteLabel:"#37393A",
+
+			//#fefae0 - consilk light text/highlight
+			//#C33C54 - rose red accent
+			//#FA7921 - pumpkin accent
+			//#874E1C - russet brown
+			//#1BE7FF - electric blue accent
+			//#37393A - onyx
+			//#283618 - forest green
+		}
+		const PI = Math.PI
+		let canvasWidth = 600
+		let canvasHeight = 250
+		const scaleContext = { root: "C", mode: "ion" }
+		const modeNames = [ "ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian" ]
+		const modeIntervals = {
+
+			"maj": 		  [0, 2, 4, 5, 7, 9, 11], // default
+			"min": 		  [0, 2, 3, 5, 7, 8, 10],
+
+			"ionian": 	  [0, 2, 4, 5, 7, 9, 11],
+			"dorian": 	  [0, 2, 3, 5, 7, 9, 10],
+			"phrygian":   [0, 1, 3, 5, 7, 8, 10],
+			"lydian": 	  [0, 2, 4, 6, 7, 9, 11],
+			"mixolydian": [0, 2, 4, 5, 7, 9, 10],
+			"aeolian": 	  [0, 2, 3, 5, 7, 8, 10],
+			"locrian": 	  [0, 1, 3, 5, 6, 8, 10],
+		}
+		const noteNames = ["E","F","F#","G","G#","A","A#","B","C","C#","D","D#"]
+		const numFrets = 23
+		const numStrings = 6
+		const stringNames = ["6th", "5th", "4th", "3rd", "2nd", "1st"]
+		const stringIntervals = [ 5, 5, 5, 4, 5 ]
+		const notesPerString = numFrets + 1
+		const noteRadius = ( 1 / numStrings ) * .2
+
+		const mode = modeNameOrNumber => typeof modeNameOrNumber === "number"
+			? modeIntervals[modeNames[modeNameOrNumber - 1]]
+			: Object.entries(modeIntervals).find(([k,_])=>k.startsWith(modeNameOrNumber))[1]
+		
+		const scaleNotes = (scaleName, ordinals=[1,2,3,4,5,6,7]) => {
+			const modeIndex = (scaleName[1] === "#") ? 2 : 1
+			const scaleNote = scaleName.slice(0, modeIndex)
+			const scaleMode = scaleName.slice(modeIndex)
+			const firstNoteIndex = noteNames.indexOf(scaleNote)
+			return mode(scaleMode)
+				.filter((_,i) => ordinals.includes(i + 1))
+				.map(i => noteNames[(firstNoteIndex + i) % noteNames.length])
+		}
+
+		const scaleCondition = (scale, ordinals=[1,2,3,4,5,6,7]) => ({
+			noteName: x => scaleNotes(scale, ordinals).includes(x),
+		})
+
+		const noteNameForInterval = noteInterval => 
+			noteNames[noteInterval % noteNames.length]
+
+		const objectMatchesRule = (object, rule) => 
+			Object.entries(rule).every(([attrName, matchFn]) => matchFn(object[attrName]))
+
+		const positionMatchesConditions = (position, conditions) => 
+			conditions.some(rule => objectMatchesRule(position, rule))
+
+		const stringCtrY = stringIndex => 
+			1 - (( (stringIndex + 1) + .5 ) * ( 1 / (numStrings + 1) ))
+
+		const fretCtrX = fretNumber => 
+			( fretNumber + .5 ) * ( 1 / notesPerString )
+
+		const positions = Array
+			.from({ length: numStrings * notesPerString })
+			.map((_, id) => { 
+				const stringIndex = Math.floor(id/notesPerString)
+				const fretNumber = id % notesPerString
+				const stringStartingInterval = stringIntervals
+					.slice(0, stringIndex)
+					.reduce((totalInterval, stringInterval) => totalInterval + stringInterval, 0) ?? 0
+				const noteInterval = stringStartingInterval + fretNumber
+				const noteName = noteNameForInterval(noteInterval)
+				return { id, stringIndex, fretNumber, noteInterval, noteName }
+			})
+
+		
+		const getGraphicContext = (context) => {
+			context.canvas ??= document.getElementById("canvas")
+			return context.canvas.getContext("2d")
+		}
+		const xy = (x, y) => 
+			[ x * canvasWidth, y * canvasHeight ]
+		const xyr = (x, y, r) => 
+			[ ...xy(x,y), r * canvasHeight, r * canvasHeight, 0, 0, 2 * PI ]
+		const draw = (context) => {
+			const ctx = getGraphicContext(context)
+			ctx.reset()
+			ctx.fillStyle = COLORS.background
+			ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+			drawFretboard(context)
+			drawPositions(context)
+			drawLabels(context)
+		}
+		const drawFretboard = (context) => {
+			for (let i = 0; i < notesPerString; i ++) 
+				drawFret(i, context)
+			for (let i = 0; i < numStrings; i ++) 
+				drawString(i, context)
+		}
+		const drawPositions = (context) => {
+			const g = getGraphicContext(context)
+			positions
+				.filter(p => positionMatchesConditions(p, context.visibleConditions))
+				.forEach(p => {
+					const pX = fretCtrX(p.fretNumber)
+					const pY = stringCtrY(p.stringIndex)
+					g.strokeStyle = COLORS.note
+					g.lineWidth = 2
+					g.beginPath()
+					g.ellipse(...xyr(pX, pY, noteRadius * 1.5))
+					g.stroke()
+
+					g.fillStyle = COLORS.note
+					g.font = "11px Helvetica"
+					g.textBaseline = "middle"
+					g.textAlign = "center"
+					g.fillText(`${p.noteName}`, ...xy(pX, pY))					
+				})
+
+			positions
+				.filter(p => positionMatchesConditions(p, context.activeConditions))
+				.forEach(p => {
+					const pX = fretCtrX(p.fretNumber)
+					const pY = stringCtrY(p.stringIndex)
+					g.fillStyle = p.noteName === scaleContext.root 
+						? COLORS.rootNote 
+						: COLORS.note
+					g.beginPath()
+					g.ellipse(...xyr(pX, pY, noteRadius))
+					g.fill()
+
+					g.fillStyle = p.noteName === scaleContext.root 
+						? COLORS.rootNoteLabel 
+						: COLORS.noteLabel
+					g.font = "11px Helvetica"
+					g.textBaseline = "middle"
+					g.textAlign = "center"
+					g.fillText(`${p.noteName}`, ...xy(pX, pY))
+				})
+		}
+		const drawLabels = (context) => {}
+		const drawString = (stringIndex, context) => {
+			const y = stringCtrY(stringIndex)
+			const x0 = fretCtrX(.5)
+			const x1 = fretCtrX(numFrets + .5)
+			const g = getGraphicContext(context)
+			g.strokeStyle = COLORS.strings
+			g.lineWidth = Math.min(3, numStrings - stringIndex)
+			g.beginPath()
+			g.moveTo(...xy(x0, y))
+			g.lineTo(...xy(x1, y))
+			g.stroke()
+		}
+		const drawFret = (fretNumber, context) => {
+			const fretMargin = 0.25
+			const x0 = fretCtrX(fretNumber - .5)
+			const x1 = fretCtrX(fretNumber + .5)
+			const y0 = stringCtrY(-fretMargin)
+			const y1 = stringCtrY(numStrings-1+fretMargin)
+			const xc = (x0+x1)/2
+			const yc = (y0+y1)/2
+			const xd = x1-x0
+			const yd = y1-y0
+			const g = getGraphicContext(context)
+
+			// draw inlay
+			if (fretNumber > 0) {
+				const inlayRadius = noteRadius * 1.25
+
+				g.fillStyle = COLORS.fretboard
+				g.fillRect(...xy(x0, y0), ...xy(xd, yd))
+
+				if ([3,5,7,9,15,17,19,21].includes(fretNumber)) {
+					g.fillStyle = COLORS.inlay
+					g.beginPath()
+					g.ellipse(...xyr(xc, yc, inlayRadius ))
+					g.fill()
+				}
+
+				if ([12,24].includes(fretNumber)) {
+					g.fillStyle = COLORS.inlay
+					g.fillRect(...xy(x0+xd/4, y0+yd/4), ...xy(xd/2, yd/2))
+				}
+			}
+
+			// draw fret line
+			g.strokeStyle = COLORS.frets
+			g.lineWidth = 2
+			g.beginPath()
+			g.moveTo(...xy(x1, y0))
+			g.lineTo(...xy(x1, y1))
+			g.stroke()
+
+			// draw fret label
+			const labelX = fretCtrX(fretNumber)
+			const labelY = stringCtrY(-1)
+			g.fillStyle = COLORS.text
+			g.font = "12px Helvetica"
+			g.textAlign = "center"
+			g.textBaseline = "bottom"
+			g.fillText(`${fretNumber}`, ...xy(labelX, labelY))
+		}
+
+		const updateDisplay = () => {
+			document.getElementById("display").innerHTML = scaleContext.root + " " + scaleContext.mode
+		}
+
+		const init = () => {
+			resize()
+			const canvas = document.getElementById("canvas")
+			canvas.height = canvasHeight
+			canvas.width = canvasWidth
+			const drawContext = {
+				visibleConditions: [
+					scaleCondition(scaleContext.root + scaleContext.mode)
+				],
+				activeConditions: [
+					scaleCondition(scaleContext.root + scaleContext.mode, [1,3,5,7])
+				]
+			}
+			draw(drawContext)
+			updateDisplay()			
+		}
+		const setNote = note => {
+			scaleContext.root = note
+			init()
+		}
+		const setMode = mode => {
+			scaleContext.mode = mode
+			init()
+		}
+		const resize = () => {
+			canvasWidth = window.innerWidth - 50
+		}
+	</script>
+</head>
+
+<body onload="init()" onresize="init()">
+
+	<div>
+		<canvas id="canvas" />
+	</div>
+
+	<div>
+		<span id="display"></span>
+	</div>
+
+	<div>
+		<button onclick="setNote('C')">C</button>
+		<button onclick="setNote('C#')">C#</button>
+		<button onclick="setNote('D')">D</button>
+		<button onclick="setNote('D#')">D#</button>
+		<button onclick="setNote('E')">E</button>
+		<button onclick="setNote('F')">F</button>
+		<button onclick="setNote('F#')">F#</button>
+		<button onclick="setNote('G')">G</button>
+		<button onclick="setNote('G#')">G#</button>
+		<button onclick="setNote('A')">A</button>
+		<button onclick="setNote('A#')">A#</button>
+		<button onclick="setNote('B')">B</button>
+	</div>
+
+	<div>
+		<button onclick="setMode('ion')">Ionian (Major)</button>
+		<button onclick="setMode('dor')">Dorian</button>
+		<button onclick="setMode('phr')">Phrygian</button>
+		<button onclick="setMode('lyd')">Lydian</button>
+		<button onclick="setMode('mix')">Mixolydian</button>
+		<button onclick="setMode('aeo')">Aeolian (Minor)</button>
+		<button onclick="setMode('loc')">Locrian</button>
+	</div>
+
+</body>
+
+</html>
