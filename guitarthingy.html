@@ -2,10 +2,27 @@
 
 -->
 
-<html style="background: #37393A; color: #fefae0; font-family: sans-serif;">
+<html>
 <head>
+	<style>
+		html {
+			font-family: sans-serif;
+		}
+	</style>
 	<script>
-		const COLORS = {
+		const LIGHT_MODE_COLORS = {
+			background:"white",
+			text:"black",
+			fretboard:"#CCCCCC",
+			inlay:"#DDDDDD",
+			frets:"#EEEEEE",
+			strings:"black",
+			note:"black",
+			noteLabel:"white",
+			rootNote:"#C33C54",
+			rootNoteLabel:"white",
+		}
+		const DARK_MODE_COLORS = {
 			background:"#37393A",
 			text:"#FA7921",
 			fretboard:"#874E1C",
@@ -25,6 +42,7 @@
 			//#37393A - onyx
 			//#283618 - forest green
 		}
+		let COLORS = LIGHT_MODE_COLORS
 		const PI = Math.PI
 		let canvasWidth = 600
 		let canvasHeight = 250
@@ -130,9 +148,11 @@
 					const pX = fretCtrX(p.fretNumber)
 					const pY = stringCtrY(p.stringIndex)
 					g.strokeStyle = COLORS.note
+					g.fillStyle = COLORS.fretboard
 					g.lineWidth = 2
 					g.beginPath()
 					g.ellipse(...xyr(pX, pY, noteRadius * 1.5))
+					g.fill()
 					g.stroke()
 
 					g.fillStyle = COLORS.note
@@ -231,6 +251,8 @@
 		}
 
 		const init = () => {
+			document.body.style.background = COLORS.background
+			document.body.style.color = COLORS.text
 			resize()
 			const canvas = document.getElementById("canvas")
 			canvas.height = canvasHeight
@@ -256,6 +278,10 @@
 		}
 		const resize = () => {
 			canvasWidth = window.innerWidth - 50
+		}
+		const lightDarkMode = () => {
+			COLORS = (COLORS === LIGHT_MODE_COLORS) ? DARK_MODE_COLORS : LIGHT_MODE_COLORS
+			init()
 		}
 	</script>
 </head>
@@ -293,6 +319,10 @@
 		<button onclick="setMode('mix')">Mixolydian</button>
 		<button onclick="setMode('aeo')">Aeolian (Minor)</button>
 		<button onclick="setMode('loc')">Locrian</button>
+	</div>
+
+	<div>
+		<button onclick="lightDarkMode()">Light/Dark Mode</button>
 	</div>
 
 </body>
